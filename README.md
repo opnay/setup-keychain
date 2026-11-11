@@ -46,6 +46,9 @@ Replace the build command with your project's command. No separate cleanup step 
 
 Download or create the PKCS12 file in a preceding step. The action preserves that original file; your workflow owns its cleanup.
 
+> [!IMPORTANT]
+> Do not commit the `.p12` file directly to your repository; use encryption such as age or download it securely from a trusted source.
+
 ```yaml
 - id: signing
   uses: opnay/setup-keychain@v1
