@@ -6,7 +6,7 @@ This repository contains two JavaScript GitHub Actions, implemented in TypeScrip
 
 ## Usage
 
-The examples use the `v1` major release tag. Use `v1.0.0` for the initial release, or pin both actions to the same full commit SHA for reproducible builds. The `v1` tag may advance to compatible fixes; versioned release tags remain fixed.
+The examples use `v1.0.0`. Keep both actions on the same release, or pin both to the same full commit SHA for reproducible builds.
 
 Store PKCS12 content and its password in GitHub Actions secrets. Base64 is an encoding, **not encryption**. To encode a file on macOS:
 
@@ -21,17 +21,17 @@ jobs:
   sign:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - id: signing
-        uses: opnay/setup-keychain@v1
+        uses: opnay/setup-keychain@v1.0.0
       - name: Import application identity
-        uses: opnay/setup-keychain/import@v1
+        uses: opnay/setup-keychain/import@v1.0.0
         with:
           keychain-path: ${{ steps.signing.outputs.keychain-path }}
           certificate-base64: ${{ secrets.APP_CERTIFICATE_BASE64 }}
           certificate-password: ${{ secrets.APP_CERTIFICATE_PASSWORD }}
       - name: Import installer identity
-        uses: opnay/setup-keychain/import@v1
+        uses: opnay/setup-keychain/import@v1.0.0
         with:
           keychain-path: ${{ steps.signing.outputs.keychain-path }}
           certificate-base64: ${{ secrets.INSTALLER_CERTIFICATE_BASE64 }}
@@ -51,8 +51,8 @@ Download or create the PKCS12 file in a preceding step. The action preserves tha
 
 ```yaml
 - id: signing
-  uses: opnay/setup-keychain@v1
-- uses: opnay/setup-keychain/import@v1
+  uses: opnay/setup-keychain@v1.0.0
+- uses: opnay/setup-keychain/import@v1.0.0
   with:
     keychain-path: ${{ steps.signing.outputs.keychain-path }}
     certificate-path: ${{ runner.temp }}/application.p12
@@ -64,7 +64,7 @@ Download or create the PKCS12 file in a preceding step. The action preserves tha
 Explicitly connect the environment variable to the action input:
 
 ```yaml
-- uses: opnay/setup-keychain/import@v1
+- uses: opnay/setup-keychain/import@v1.0.0
   with:
     keychain-path: ${{ steps.signing.outputs.keychain-path }}
     certificate-base64: ${{ env.SIGNING_CERTIFICATE_BASE64 }}
@@ -96,17 +96,13 @@ Use explicit step outputs when creating more than one keychain. The environment 
 
 The import action has no outputs. Use a GitHub secret for each certificate password. Empty passwords are not supported: empty-password PKCS12 interoperability varies by exporter and macOS import behavior. Re-export with a nonempty password. Missing or empty passwords fail before any import command. An incorrect password, invalid PKCS12 file, or failed partition-list update fails the step. Import failure does not delete the keychain or roll back other certificates. If the import succeeds but partition configuration fails, the newly imported identity may remain.
 
-## Lifecycle and design
+## Lifecycle
 
-1. Setup requires macOS, `RUNNER_TEMP`, GitHub run/job identifiers, and one existing user default keychain. It reads the user search list and default before changing anything.
-2. Setup creates a unique `setup-keychain-*` directory under the canonical runner temporary directory with mode `0700`. A `0600` state file stores the snapshot, managed keychain path, job identity, and a cryptographically random keychain password.
-3. Setup creates and unlocks the keychain, configures a six-hour lock timeout, preserves existing search-list entries, and appends the new keychain. Only `set-default: true` changes the default.
-4. Import validates the managed directory, state, job identity, file ownership, permissions, path structure, and absence of symlinks. It copies or decodes the certificate to a private temporary file, unlocks the keychain, imports the PKCS12 identity, and sets signing-key partitions to `apple-tool:,apple:,codesign:` for noninteractive `codesign` use. The temporary certificate copy is removed even on failure.
-5. Setup's post action restores its captured search list, restores the original default if it changed it, deletes its keychain, and removes its state directory. Multiple setup posts run in reverse order, restoring each previous snapshot.
+Setup requires macOS, the GitHub Actions runner environment, and an existing user default keychain. It creates an unlocked temporary keychain and adds it to the user search list. Only `set-default: true` changes the default keychain. Imports prepare signing keys for noninteractive `codesign` use and remove their private certificate copies, including on failure.
 
-Setup registers its cleanup path through `GITHUB_STATE` before creating the keychain. That state only connects this setup invocation's main and post processes. Independent `uses` invocations cannot share `GITHUB_STATE`; import finds the restricted state file through the explicit keychain path instead.
+At the end of the job, setup restores the captured search list and default, deletes its keychain, and removes its private state. Multiple setups clean up in reverse order. Setup failures attempt immediate cleanup; the post action retries retained state if cleanup failed.
 
-Setup failures attempt immediate cleanup. If an OS cleanup operation fails, the action attempts the other cleanup operations, retains state for retry, and reports failure. The post action retries retained setup state. Post cleanup also removes private, owned files matching the action's exact temporary certificate filename format after an interrupted import. Unexpected files, symlinks, and hard links are preserved and reported; directories are never recursively deleted during post cleanup. Do not remove or alter the managed directory during the job. If it is missing, post warns that the saved snapshot is unavailable and automatic restoration cannot be verified. A hard runner termination can prevent cleanup entirely; operators of self-hosted runners must handle abandoned resources.
+Do not remove or alter the managed directory during the job. Cleanup preserves unexpected files and reports failures. Hard runner termination can prevent cleanup entirely; self-hosted runner operators must handle abandoned resources.
 
 ## Security and boundaries
 
