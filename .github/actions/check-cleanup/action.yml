@@ -1,0 +1,7 @@
+name: Verify cleanup after action posts
+description: Capture the disposable runner baseline and verify final restoration.
+runs:
+  using: node24
+  main: main.cjs
+  post: post.cjs
+  post-if: always()

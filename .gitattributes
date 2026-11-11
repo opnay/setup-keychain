@@ -1,0 +1,2 @@
+# Generated dependency bundles can contain whitespace inside template literals.
+dist/** -whitespace linguist-generated=true

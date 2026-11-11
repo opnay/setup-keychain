@@ -1,0 +1,7 @@
+node_modules/
+coverage/
+*.p12
+*.pem
+*.key
+.env*
+.DS_Store

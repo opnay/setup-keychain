@@ -1,0 +1,18 @@
+name: Setup Keychain
+description: Create a temporary managed macOS keychain and clean it up after the job.
+author: opnay
+inputs:
+  set-default:
+    description: Make this keychain the user default until cleanup.
+    default: 'false'
+outputs:
+  keychain-path:
+    description: Absolute path to the managed keychain.
+runs:
+  using: node24
+  main: dist/setup/index.js
+  post: dist/post/index.js
+  post-if: always()
+branding:
+  icon: key
+  color: blue

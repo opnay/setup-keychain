@@ -1,0 +1,16 @@
+name: Import Keychain Identity
+description: Import one PKCS12 identity into a keychain created by setup-keychain.
+inputs:
+  keychain-path:
+    description: The setup action keychain-path output.
+    required: true
+  certificate-path:
+    description: Path to a PKCS12 file. Mutually exclusive with certificate-base64.
+  certificate-base64:
+    description: Base64 PKCS12 content. Mutually exclusive with certificate-path.
+  certificate-password:
+    description: PKCS12 password. Omit or use an empty value for an empty password.
+    default: ''
+runs:
+  using: node24
+  main: ../dist/import/index.js

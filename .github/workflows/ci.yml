@@ -1,0 +1,81 @@
+name: CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+      - run: git diff --exit-code -- dist
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+      - uses: ./.github/actions/check-cleanup
+      - run: bash scripts/fixtures.sh
+      - id: signing
+        uses: ./
+        with:
+          set-default: 'true'
+      - uses: ./import
+        with:
+          keychain-path: ${{ steps.signing.outputs.keychain-path }}
+          certificate-path: ${{ runner.temp }}/identities/first.p12
+          certificate-password: test-password
+      - uses: ./import
+        with:
+          keychain-path: ${{ steps.signing.outputs.keychain-path }}
+          certificate-base64: ${{ env.SECOND_CERTIFICATE }}
+          certificate-password: ''
+      - id: invalid
+        continue-on-error: true
+        uses: ./import
+        with:
+          keychain-path: ${{ steps.signing.outputs.keychain-path }}
+          certificate-path: ${{ runner.temp }}/identities/first.p12
+          certificate-password: incorrect-password
+      - name: Verify identities and noninteractive signing
+        env:
+          KEYCHAIN: ${{ steps.signing.outputs.keychain-path }}
+          FAILED_IMPORT: ${{ steps.invalid.outcome }}
+        run: |
+          test "$FAILED_IMPORT" = failure
+          test "$SETUP_KEYCHAIN_PATH" = "$KEYCHAIN"
+          test -f "$RUNNER_TEMP/identities/first.p12"
+          test -f "$RUNNER_TEMP/identities/second.p12"
+          security find-certificate -a "$KEYCHAIN" | tee "$RUNNER_TEMP/certificates.txt"
+          test "$(grep -c 'alis' "$RUNNER_TEMP/certificates.txt")" = 2
+          printf 'int main(void) { return 0; }\n' > "$RUNNER_TEMP/test.c"
+          cc "$RUNNER_TEMP/test.c" -o "$RUNNER_TEMP/test-binary"
+          codesign --force --sign 'Setup Keychain Test first' --keychain "$KEYCHAIN" --timestamp=none "$RUNNER_TEMP/test-binary"
+          codesign --verify --verbose "$RUNNER_TEMP/test-binary"
+          codesign --force --sign 'Setup Keychain Test second' --keychain "$KEYCHAIN" --timestamp=none "$RUNNER_TEMP/test-binary"
+          codesign --verify --verbose "$RUNNER_TEMP/test-binary"
+      - id: second
+        uses: ./
+      - name: Verify separate setup output and last environment value
+        env:
+          FIRST: ${{ steps.signing.outputs.keychain-path }}
+          SECOND: ${{ steps.second.outputs.keychain-path }}
+        run: |
+          test "$FIRST" != "$SECOND"
+          test "$SETUP_KEYCHAIN_PATH" = "$SECOND"
+          security list-keychains -d user | grep -F "$FIRST"
+          security list-keychains -d user | grep -F "$SECOND"
+          security default-keychain -d user | grep -F "$FIRST"
