@@ -6,7 +6,7 @@ This repository contains two JavaScript GitHub Actions, implemented in TypeScrip
 
 ## Usage
 
-The examples use the published `main` branch. For reproducible builds, pin both actions to the same full commit SHA. A `v1` major tag will be published only after release validation succeeds; do not use that ref until it exists.
+The examples use the `v1` major release tag. Use `v1.0.0` for the initial release, or pin both actions to the same full commit SHA for reproducible builds. The `v1` tag may advance to compatible fixes; versioned release tags remain fixed.
 
 Store PKCS12 content and its password in GitHub Actions secrets. Base64 is an encoding, **not encryption**. To encode a file on macOS:
 
@@ -23,15 +23,15 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - id: signing
-        uses: opnay/setup-keychain@main
+        uses: opnay/setup-keychain@v1
       - name: Import application identity
-        uses: opnay/setup-keychain/import@main
+        uses: opnay/setup-keychain/import@v1
         with:
           keychain-path: ${{ steps.signing.outputs.keychain-path }}
           certificate-base64: ${{ secrets.APP_CERTIFICATE_BASE64 }}
           certificate-password: ${{ secrets.APP_CERTIFICATE_PASSWORD }}
       - name: Import installer identity
-        uses: opnay/setup-keychain/import@main
+        uses: opnay/setup-keychain/import@v1
         with:
           keychain-path: ${{ steps.signing.outputs.keychain-path }}
           certificate-base64: ${{ secrets.INSTALLER_CERTIFICATE_BASE64 }}
@@ -48,8 +48,8 @@ Download or create the PKCS12 file in a preceding step. The action preserves tha
 
 ```yaml
 - id: signing
-  uses: opnay/setup-keychain@main
-- uses: opnay/setup-keychain/import@main
+  uses: opnay/setup-keychain@v1
+- uses: opnay/setup-keychain/import@v1
   with:
     keychain-path: ${{ steps.signing.outputs.keychain-path }}
     certificate-path: ${{ runner.temp }}/application.p12
@@ -61,7 +61,7 @@ Download or create the PKCS12 file in a preceding step. The action preserves tha
 Explicitly connect the environment variable to the action input:
 
 ```yaml
-- uses: opnay/setup-keychain/import@main
+- uses: opnay/setup-keychain/import@v1
   with:
     keychain-path: ${{ steps.signing.outputs.keychain-path }}
     certificate-base64: ${{ env.SIGNING_CERTIFICATE_BASE64 }}
@@ -128,9 +128,9 @@ npm run check
 
 `check` type-checks TypeScript, runs tests, and regenerates the three committed bundles. Commit bundle changes alongside source changes. CI rejects bundle drift. Dependencies are locked in `package-lock.json`.
 
-Unit tests use a security-command adapter and temporary files. They cover reverse lifecycle restoration, setup failures at each mutation, partial cleanup/retry, repeated imports, rejection of empty passwords, source preservation, import/partition failures, and invalid or unsafe managed state. They do not prove macOS cryptographic behavior and do not change your local user keychain settings.
+Unit tests use a security-command adapter and temporary files. They cover reverse lifecycle restoration, setup failures at each mutation, partial cleanup/retry for each OS operation, missing state, interrupted-import residues, secret-safe command errors, repeated imports, rejection of empty passwords, source preservation, import/partition failures, and invalid or unsafe managed state. They do not prove macOS cryptographic behavior and do not change your local user keychain settings.
 
-The macOS CI job uses an ephemeral GitHub-hosted runner. It generates two disposable self-signed identities, runs the actual bundled actions through file and Base64 inputs, tests an incorrect password, verifies both identities can sign a compiled binary without interaction, and creates a second keychain. A separate post verifier runs after setup posts and checks exact search/default restoration and managed-directory removal. No real Apple credentials are required. This proves keychain mechanics, not distribution signing, notarization, or provisioning.
+The macOS CI job uses an ephemeral GitHub-hosted runner. It generates two disposable self-signed identities, runs the actual bundled actions through file and Base64 inputs, tests an incorrect password, verifies both identities can sign a compiled binary without interaction, and creates a second keychain. A separate post verifier runs after setup posts and checks exact search/default restoration and managed-directory removal, including a simulated interrupted-import residue. A disposable-runner integration check also covers nested keychains under a non-ASCII path containing spaces. No real Apple credentials are required. This proves keychain mechanics, not distribution signing, notarization, or provisioning.
 
 Do not run the CI lifecycle manually against your everyday macOS account. Use an isolated disposable runner or dedicated user with a known baseline.
 
