@@ -3038,9 +3038,9 @@ function job() {
     return value;
   }).join(":");
 }
-function privateEntry(file, directory) {
+function privateEntry(file, directory, requirePrivate = true) {
   const stat = fs.lstatSync(file);
-  if (stat.isSymbolicLink() || (directory ? !stat.isDirectory() : !stat.isFile()) || stat.uid !== process.getuid?.() || (stat.mode & 63) !== 0 || !directory && stat.nlink !== 1) {
+  if (stat.isSymbolicLink() || (directory ? !stat.isDirectory() : !stat.isFile()) || stat.uid !== process.getuid?.() || requirePrivate && (stat.mode & 63) !== 0 || !directory && stat.nlink !== 1) {
     throw new Error("Managed state has unsafe ownership, permissions, or file type.");
   }
 }

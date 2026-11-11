@@ -32,7 +32,7 @@ function fixture() {
         else return JSON.stringify(defaultKeychain);
         break;
       case 'create-keychain':
-        fs.writeFileSync(last, '', { mode: 0o600 });
+        fs.writeFileSync(last, '', { mode: 0o644 });
         search.push(last); // macOS can add the keychain while creating it.
         identities.set(last, []);
         break;
@@ -53,6 +53,7 @@ test('nested setup preserves search/default and reverse cleanup restores each sn
     let saved = '';
     const first = create(f.temp, true, f.run, key => { saved = key; });
     assert.equal(saved, first.keychain);
+    assert.equal(fs.statSync(first.keychain).mode & 0o777, 0o600);
     const second = create(f.temp, false, f.run, () => {});
     assert.notEqual(first.keychain, second.keychain);
     assert.notEqual(first.password, second.password);

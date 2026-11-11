@@ -12,4 +12,6 @@ for name in first second; do
   openssl pkcs12 -export -legacy -inkey "$RUNNER_TEMP/identities/$name.key" \
     -in "$RUNNER_TEMP/identities/$name.pem" -out "$RUNNER_TEMP/identities/$name.p12" -passout "pass:$password"
 done
-printf 'SECOND_CERTIFICATE=%s\n' "$(base64 < "$RUNNER_TEMP/identities/second.p12" | tr -d '\n')" >> "$GITHUB_ENV"
+encoded=$(base64 < "$RUNNER_TEMP/identities/second.p12" | tr -d '\n')
+printf '::add-mask::%s\n' "$encoded"
+printf 'SECOND_CERTIFICATE=%s\n' "$encoded" >> "$GITHUB_ENV"

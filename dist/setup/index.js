@@ -3044,9 +3044,9 @@ function job() {
     return value;
   }).join(":");
 }
-function privateEntry(file, directory) {
+function privateEntry(file, directory, requirePrivate = true) {
   const stat = fs.lstatSync(file);
-  if (stat.isSymbolicLink() || (directory ? !stat.isDirectory() : !stat.isFile()) || stat.uid !== process.getuid?.() || (stat.mode & 63) !== 0 || !directory && stat.nlink !== 1) {
+  if (stat.isSymbolicLink() || (directory ? !stat.isDirectory() : !stat.isFile()) || stat.uid !== process.getuid?.() || requirePrivate && (stat.mode & 63) !== 0 || !directory && stat.nlink !== 1) {
     throw new Error("Managed state has unsafe ownership, permissions, or file type.");
   }
 }
@@ -3079,6 +3079,8 @@ function create(temp2, setDefault, run, register) {
   }
   try {
     run(["create-keychain", "-p", state.password, state.keychain]);
+    privateEntry(state.keychain, false, false);
+    fs.chmodSync(state.keychain, 384);
     run(["set-keychain-settings", "-lut", "21600", state.keychain]);
     run(["unlock-keychain", "-p", state.password, state.keychain]);
     run(["list-keychains", "-d", "user", "-s", ...search, state.keychain]);
@@ -3112,7 +3114,7 @@ function cleanup(temp2, keychain2, run) {
   });
   attempt("keychain deletion", () => {
     if (fs.existsSync(keychain2)) {
-      privateEntry(keychain2, false);
+      privateEntry(keychain2, false, false);
       run(["delete-keychain", keychain2]);
     }
   });

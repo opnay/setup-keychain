@@ -27,10 +27,10 @@ function job(): string {
   }).join(':');
 }
 
-function privateEntry(file: string, directory: boolean): void {
+function privateEntry(file: string, directory: boolean, requirePrivate = true): void {
   const stat = fs.lstatSync(file);
   if (stat.isSymbolicLink() || (directory ? !stat.isDirectory() : !stat.isFile()) ||
-      stat.uid !== process.getuid?.() || (stat.mode & 0o077) !== 0 || (!directory && stat.nlink !== 1)) {
+      stat.uid !== process.getuid?.() || (requirePrivate && (stat.mode & 0o077) !== 0) || (!directory && stat.nlink !== 1)) {
     throw new Error('Managed state has unsafe ownership, permissions, or file type.');
   }
 }
@@ -70,6 +70,8 @@ export function create(temp: string, setDefault: boolean, run: Security, registe
   }
   try {
     run(['create-keychain', '-p', state.password, state.keychain]);
+    privateEntry(state.keychain, false, false);
+    fs.chmodSync(state.keychain, 0o600);
     run(['set-keychain-settings', '-lut', '21600', state.keychain]);
     run(['unlock-keychain', '-p', state.password, state.keychain]);
     run(['list-keychains', '-d', 'user', '-s', ...search, state.keychain]);
@@ -92,7 +94,7 @@ export function cleanup(temp: string, keychain: string, run: Security): void {
   attempt('search restoration', () => { run(['list-keychains', '-d', 'user', '-s', ...state.search]); });
   attempt('keychain deletion', () => {
     if (fs.existsSync(keychain)) {
-      privateEntry(keychain, false);
+      privateEntry(keychain, false, false);
       run(['delete-keychain', keychain]);
     }
   });
