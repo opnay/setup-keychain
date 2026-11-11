@@ -3057,6 +3057,7 @@ function readState(temp, keychain) {
   return state;
 }
 function importIdentity(temp, keychain, file, base64, password, run) {
+  if (!password) throw new Error("certificate-password must be nonempty; empty-password PKCS12 files are not supported.");
   if (Boolean(file) === Boolean(base64)) throw new Error("Provide exactly one of certificate-path or certificate-base64.");
   const state = readState(temp, keychain);
   privateEntry(keychain, false);

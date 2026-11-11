@@ -9,8 +9,8 @@ inputs:
   certificate-base64:
     description: Base64 PKCS12 content. Mutually exclusive with certificate-path.
   certificate-password:
-    description: PKCS12 password. Omit or use an empty value for an empty password.
-    default: ''
+    description: Nonempty PKCS12 password, supplied through a GitHub secret.
+    required: true
 runs:
   using: node24
   main: ../dist/import/index.js

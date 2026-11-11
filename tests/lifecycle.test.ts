@@ -102,14 +102,14 @@ test('two imports preserve source and prior identities; failed partition update 
     const state = create(f.temp, false, f.run, () => {});
     const source = path.join(f.temp, 'source.p12');
     fs.writeFileSync(source, 'first');
-    importIdentity(f.temp, state.keychain, source, '', '', f.run);
+    importIdentity(f.temp, state.keychain, source, '', 'first-password', f.run);
     importIdentity(f.temp, state.keychain, '', Buffer.from('second').toString('base64'), ' p a s s ', f.run);
     f.fail('set-key-partition-list');
     assert.throws(() => importIdentity(f.temp, state.keychain, source, '', 'bad', f.run));
     assert.equal(fs.readFileSync(source, 'utf8'), 'first');
     assert.deepEqual(f.identities.get(state.keychain), ['first', 'second', 'first']);
     assert.deepEqual(fs.readdirSync(path.dirname(state.keychain)).sort(), ['signing.keychain-db', 'state.json']);
-    assert.ok(f.calls.some(args => args[0] === 'import' && args[7] === ''));
+    assert.ok(f.calls.some(args => args[0] === 'import' && args[7] === 'first-password'));
     assert.equal(f.defaultKeychain(), '/original/login.keychain-db');
     cleanup(f.temp, state.keychain, f.run);
     assert.equal(fs.readFileSync(source, 'utf8'), 'first');
@@ -121,10 +121,13 @@ test('input errors and import command failure leave no transient certificate fil
   try {
     const state = create(f.temp, false, f.run, () => {});
     for (const [file, encoded] of [['', ''], ['x', 'eA=='], ['', '%%%'], ['', 'YQ=']]) {
-      assert.throws(() => importIdentity(f.temp, state.keychain, file, encoded, '', f.run));
+      assert.throws(() => importIdentity(f.temp, state.keychain, file, encoded, 'password', f.run));
     }
+    const before = f.calls.length;
+    assert.throws(() => importIdentity(f.temp, state.keychain, '', 'eA==', '', f.run), /must be nonempty/);
+    assert.equal(f.calls.length, before);
     f.fail('import');
-    assert.throws(() => importIdentity(f.temp, state.keychain, '', 'eA==', '', f.run));
+    assert.throws(() => importIdentity(f.temp, state.keychain, '', 'eA==', 'password', f.run));
     assert.deepEqual(fs.readdirSync(path.dirname(state.keychain)).sort(), ['signing.keychain-db', 'state.json']);
     assert.deepEqual(f.identities.get(state.keychain), []);
   } finally { f.dispose(); }

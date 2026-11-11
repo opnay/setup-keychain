@@ -107,6 +107,7 @@ export function cleanup(temp: string, keychain: string, run: Security): void {
 }
 
 export function importIdentity(temp: string, keychain: string, file: string, base64: string, password: string, run: Security): void {
+  if (!password) throw new Error('certificate-password must be nonempty; empty-password PKCS12 files are not supported.');
   if (Boolean(file) === Boolean(base64)) throw new Error('Provide exactly one of certificate-path or certificate-base64.');
   const state = readState(temp, keychain);
   privateEntry(keychain, false);

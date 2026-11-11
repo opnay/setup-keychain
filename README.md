@@ -89,9 +89,9 @@ Use explicit step outputs when creating more than one keychain. The environment 
 | `keychain-path` | Yes | Path returned by a setup invocation in the same job. |
 | `certificate-path` | Exactly one source | Path to a PKCS12 file containing a certificate and private key. |
 | `certificate-base64` | Exactly one source | Base64-encoded PKCS12 content. |
-| `certificate-password` | No | PKCS12 password. Omitted or empty means an empty password; whitespace is preserved. |
+| `certificate-password` | Yes | Nonempty PKCS12 password. Whitespace is preserved. |
 
-The import action has no outputs. Use a GitHub secret for each nonempty certificate password. An incorrect password, invalid PKCS12 file, or failed partition-list update fails the step. Import failure does not delete the keychain or roll back other certificates. If the import succeeds but partition configuration fails, the newly imported identity may remain.
+The import action has no outputs. Use a GitHub secret for each certificate password. Empty passwords are not supported: empty-password PKCS12 interoperability varies by exporter and macOS import behavior. Re-export with a nonempty password. Missing or empty passwords fail before any import command. An incorrect password, invalid PKCS12 file, or failed partition-list update fails the step. Import failure does not delete the keychain or roll back other certificates. If the import succeeds but partition configuration fails, the newly imported identity may remain.
 
 ## Lifecycle and design
 
@@ -127,7 +127,7 @@ npm run check
 
 `check` type-checks TypeScript, runs tests, and regenerates the three committed bundles. Commit bundle changes alongside source changes. CI rejects bundle drift. Dependencies are locked in `package-lock.json`.
 
-Unit tests use a security-command adapter and temporary files. They cover reverse lifecycle restoration, setup failures at each mutation, partial cleanup/retry, repeated imports, empty passwords, source preservation, import/partition failures, and invalid or unsafe managed state. They do not prove macOS cryptographic behavior and do not change your local user keychain settings.
+Unit tests use a security-command adapter and temporary files. They cover reverse lifecycle restoration, setup failures at each mutation, partial cleanup/retry, repeated imports, rejection of empty passwords, source preservation, import/partition failures, and invalid or unsafe managed state. They do not prove macOS cryptographic behavior and do not change your local user keychain settings.
 
 The macOS CI job uses an ephemeral GitHub-hosted runner. It generates two disposable self-signed identities, runs the actual bundled actions through file and Base64 inputs, tests an incorrect password, verifies both identities can sign a compiled binary without interaction, and creates a second keychain. A separate post verifier runs after setup posts and checks exact search/default restoration and managed-directory removal. No real Apple credentials are required. This proves keychain mechanics, not distribution signing, notarization, or provisioning.
 

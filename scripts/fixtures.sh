@@ -8,7 +8,7 @@ for name in first second; do
     -addext 'keyUsage=digitalSignature' -addext 'extendedKeyUsage=codeSigning' \
     -keyout "$RUNNER_TEMP/identities/$name.key" -out "$RUNNER_TEMP/identities/$name.pem"
   password='test-password'
-  if [ "$name" = second ]; then password=''; fi
+  if [ "$name" = second ]; then password='second-password'; fi
   openssl pkcs12 -export -legacy -inkey "$RUNNER_TEMP/identities/$name.key" \
     -in "$RUNNER_TEMP/identities/$name.pem" -out "$RUNNER_TEMP/identities/$name.p12" -passout "pass:$password"
 done

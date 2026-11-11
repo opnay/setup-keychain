@@ -42,7 +42,7 @@ jobs:
         with:
           keychain-path: ${{ steps.signing.outputs.keychain-path }}
           certificate-base64: ${{ env.SECOND_CERTIFICATE }}
-          certificate-password: ''
+          certificate-password: second-password
       - id: invalid
         continue-on-error: true
         uses: ./import
