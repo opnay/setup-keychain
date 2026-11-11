@@ -16,7 +16,13 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm run check
-      - run: git diff --exit-code -- dist
+      - name: Verify committed build outputs
+        run: |
+          changes=$(git status --porcelain --untracked-files=all -- dist)
+          if [ -n "$changes" ]; then
+            printf '%s\n' "$changes"
+            exit 1
+          fi
   check-passed:
     name: check - passed
     needs: unit
