@@ -11,12 +11,12 @@
     "check": "npm run typecheck && npm test && npm run build"
   },
   "dependencies": {
-    "@actions/core": "^1.11.1"
+    "@actions/core": "^3.0.1"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
-    "esbuild": "^0.25.0",
-    "tsx": "^4.20.0",
-    "typescript": "^5.9.0"
+    "@types/node": "^26.6.6",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
   }
 }
