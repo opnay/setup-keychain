@@ -5,7 +5,11 @@ export type Security = (args: string[]) => string;
 // Never expose stderr or command arguments: they may contain passwords.
 export const security: Security = (args) => {
   try {
-    return execFileSync('/usr/bin/security', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    return execFileSync('/usr/bin/security', args, {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 30_000,
+    });
   } catch {
     throw new Error(`macOS security ${args[0]} failed.`);
   }

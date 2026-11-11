@@ -19660,7 +19660,11 @@ var import_node_crypto = require("node:crypto");
 var import_node_child_process = require("node:child_process");
 var security = (args) => {
   try {
-    return (0, import_node_child_process.execFileSync)("/usr/bin/security", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    return (0, import_node_child_process.execFileSync)("/usr/bin/security", args, {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 3e4
+    });
   } catch {
     throw new Error(`macOS security ${args[0]} failed.`);
   }
