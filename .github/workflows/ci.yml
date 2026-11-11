@@ -9,25 +9,27 @@ jobs:
   unit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm run check
       - run: git diff --exit-code -- dist
-  macos:
+  check-passed:
+    name: check - passed
+    needs: unit
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
       - run: npm ci --ignore-scripts
-      - run: npm run check
-      - run: npx tsx scripts/verify-unicode.ts
+      - name: Verify unicode paths
+        run: npx tsx scripts/verify-unicode.ts
       - uses: ./.github/actions/check-cleanup
       - run: bash scripts/fixtures.sh
       - id: signing
@@ -44,19 +46,10 @@ jobs:
           keychain-path: ${{ steps.signing.outputs.keychain-path }}
           certificate-base64: ${{ env.SECOND_CERTIFICATE }}
           certificate-password: second-password
-      - id: invalid
-        continue-on-error: true
-        uses: ./import
-        with:
-          keychain-path: ${{ steps.signing.outputs.keychain-path }}
-          certificate-path: ${{ runner.temp }}/identities/first.p12
-          certificate-password: incorrect-password
       - name: Verify identities and noninteractive signing
         env:
           KEYCHAIN: ${{ steps.signing.outputs.keychain-path }}
-          FAILED_IMPORT: ${{ steps.invalid.outcome }}
         run: |
-          test "$FAILED_IMPORT" = failure
           test "$SETUP_KEYCHAIN_PATH" = "$KEYCHAIN"
           test -f "$RUNNER_TEMP/identities/first.p12"
           test -f "$RUNNER_TEMP/identities/second.p12"
@@ -85,3 +78,57 @@ jobs:
           KEYCHAIN: ${{ steps.signing.outputs.keychain-path }}
         run: |
           node -e "const fs = require('node:fs'); const path = require('node:path'); fs.writeFileSync(path.join(path.dirname(process.env.KEYCHAIN), 'import-' + 'a'.repeat(24) + '.p12'), 'disposable interrupted-import fixture', { mode: 0o600 });"
+  check-incorrect-password:
+    name: check - incorrect password
+    needs: unit
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - uses: ./.github/actions/check-cleanup
+      - run: bash scripts/fixtures.sh
+      - id: signing
+        uses: ./
+      - name: Reject incorrect password
+        env:
+          KEYCHAIN: ${{ steps.signing.outputs.keychain-path }}
+        run: |
+          node --import tsx <<'JS'
+          const assert = require('node:assert/strict');
+          const path = require('node:path');
+          const { importIdentity, runnerTemp } = require('./src/managed.ts');
+          const { security } = require('./src/security.ts');
+          const temp = runnerTemp();
+          assert.throws(
+            () => importIdentity(temp, process.env.KEYCHAIN, path.join(temp, 'identities', 'first.p12'), '', 'incorrect-password', security),
+            { message: 'macOS security import failed.' },
+          );
+          JS
+  check-invalid-path:
+    name: check - invalid path
+    needs: unit
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Reject unmanaged keychain path
+        run: |
+          node --import tsx <<'JS'
+          const assert = require('node:assert/strict');
+          const path = require('node:path');
+          const { importIdentity, runnerTemp } = require('./src/managed.ts');
+          const { security } = require('./src/security.ts');
+          const temp = runnerTemp();
+          assert.throws(
+            () => importIdentity(temp, path.join(temp, 'unmanaged.keychain-db'), 'unused.p12', '', 'test-password', security),
+            { message: 'Only managed keychains under RUNNER_TEMP are supported.' },
+          );
+          JS

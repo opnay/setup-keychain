@@ -120,23 +120,6 @@ Setup failures attempt immediate cleanup. If an OS cleanup operation fails, the 
 - The keychain uses a six-hour idle timeout and may lock on sleep. Import unlocks it before use; a later signing step after a long idle period can fail. Schedule setup/import close to signing. There is no public password output or standalone unlock action.
 - Keep both action refs aligned. Self-hosted runners must support JavaScript actions using Node.js 24 and have `/usr/bin/security` and `/usr/bin/codesign` available.
 
-## Development and verification
-
-Use Node.js 24 or later and npm:
-
-```sh
-npm ci --ignore-scripts
-npm run check
-```
-
-`check` type-checks TypeScript, runs tests, and regenerates the three committed bundles. Commit bundle changes alongside source changes. CI rejects bundle drift. Dependencies are locked in `package-lock.json`.
-
-Unit tests use a security-command adapter and temporary files. They cover reverse lifecycle restoration, setup failures at each mutation, partial cleanup/retry for each OS operation, missing state, interrupted-import residues, secret-safe command errors, repeated imports, rejection of empty passwords, source preservation, import/partition failures, and invalid or unsafe managed state. They do not prove macOS cryptographic behavior and do not change your local user keychain settings.
-
-The macOS CI job uses an ephemeral GitHub-hosted runner. It generates two disposable self-signed identities, runs the actual bundled actions through file and Base64 inputs, tests an incorrect password, verifies both identities can sign a compiled binary without interaction, and creates a second keychain. A separate post verifier runs after setup posts and checks exact search/default restoration and managed-directory removal, including a simulated interrupted-import residue. A disposable-runner integration check also covers nested keychains under a non-ASCII path containing spaces. No real Apple credentials are required. This proves keychain mechanics, not distribution signing, notarization, or provisioning.
-
-Do not run the CI lifecycle manually against your everyday macOS account. Use an isolated disposable runner or dedicated user with a known baseline.
-
 ## References
 
 - [GitHub workflow commands and action state](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands)
