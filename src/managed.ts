@@ -84,8 +84,8 @@ export function create(temp: string, setDefault: boolean, run: Security, registe
   }
 }
 
-export function cleanup(temp: string, keychain: string, run: Security): void {
-  if (!fs.existsSync(path.dirname(keychain))) return;
+export function cleanup(temp: string, keychain: string, run: Security): boolean {
+  if (!fs.existsSync(path.dirname(keychain))) return false;
   const state = readState(temp, keychain);
   const failures: string[] = [];
   const attempt = (label: string, fn: () => void) => { try { fn(); } catch { failures.push(label); } };
@@ -98,12 +98,24 @@ export function cleanup(temp: string, keychain: string, run: Security): void {
       run(['delete-keychain', keychain]);
     }
   });
+  // A terminated import may not reach its finally block. Remove only our exact
+  // temporary filename format after validating ownership and private file mode.
+  for (const name of fs.readdirSync(path.dirname(keychain))) {
+    if (/^import-[a-f0-9]{24}\.p12$/.test(name)) {
+      attempt('temporary certificate deletion', () => {
+        const file = path.join(path.dirname(keychain), name);
+        privateEntry(file, false);
+        fs.unlinkSync(file);
+      });
+    }
+  }
   if (failures.length) throw new Error(`Cleanup incomplete: ${failures.join(', ')}. Managed state retained for retry.`);
   const remaining = fs.readdirSync(path.dirname(keychain));
   if (remaining.some(name => name !== 'state.json')) throw new Error('Unexpected managed directory contents; state retained for inspection.');
   fs.rmSync(path.join(path.dirname(keychain), 'state.json'));
   // Do not recursively delete unexpected files.
   fs.rmdirSync(path.dirname(keychain));
+  return true;
 }
 
 export function importIdentity(temp: string, keychain: string, file: string, base64: string, password: string, run: Security): void {

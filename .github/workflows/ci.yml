@@ -27,6 +27,7 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm run check
+      - run: npx tsx scripts/verify-unicode.ts
       - uses: ./.github/actions/check-cleanup
       - run: bash scripts/fixtures.sh
       - id: signing
@@ -79,3 +80,8 @@ jobs:
           security list-keychains -d user | grep -F "$FIRST"
           security list-keychains -d user | grep -F "$SECOND"
           security default-keychain -d user | grep -F "$FIRST"
+      - name: Simulate an interrupted import leaving an owned temporary copy
+        env:
+          KEYCHAIN: ${{ steps.signing.outputs.keychain-path }}
+        run: |
+          node -e "const fs = require('node:fs'); const path = require('node:path'); fs.writeFileSync(path.join(path.dirname(process.env.KEYCHAIN), 'import-' + 'a'.repeat(24) + '.p12'), 'disposable interrupted-import fixture', { mode: 0o600 });"

@@ -2934,10 +2934,10 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       (0, command_1.issueCommand)("error", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
     exports2.error = error;
-    function warning(message, properties = {}) {
+    function warning2(message, properties = {}) {
       (0, command_1.issueCommand)("warning", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
-    exports2.warning = warning;
+    exports2.warning = warning2;
     function notice(message, properties = {}) {
       (0, command_1.issueCommand)("notice", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
@@ -3056,7 +3056,7 @@ function readState(temp, keychain) {
   return state;
 }
 function cleanup(temp, keychain, run) {
-  if (!fs.existsSync(path.dirname(keychain))) return;
+  if (!fs.existsSync(path.dirname(keychain))) return false;
   const state = readState(temp, keychain);
   const failures = [];
   const attempt = (label, fn) => {
@@ -3078,17 +3078,29 @@ function cleanup(temp, keychain, run) {
       run(["delete-keychain", keychain]);
     }
   });
+  for (const name of fs.readdirSync(path.dirname(keychain))) {
+    if (/^import-[a-f0-9]{24}\.p12$/.test(name)) {
+      attempt("temporary certificate deletion", () => {
+        const file = path.join(path.dirname(keychain), name);
+        privateEntry(file, false);
+        fs.unlinkSync(file);
+      });
+    }
+  }
   if (failures.length) throw new Error(`Cleanup incomplete: ${failures.join(", ")}. Managed state retained for retry.`);
   const remaining = fs.readdirSync(path.dirname(keychain));
   if (remaining.some((name) => name !== "state.json")) throw new Error("Unexpected managed directory contents; state retained for inspection.");
   fs.rmSync(path.join(path.dirname(keychain), "state.json"));
   fs.rmdirSync(path.dirname(keychain));
+  return true;
 }
 
 // src/post.ts
 try {
   const keychain = core.getState("keychain");
-  if (keychain) cleanup(runnerTemp(), keychain, security);
+  if (keychain && !cleanup(runnerTemp(), keychain, security)) {
+    core.warning("Managed directory is absent. If it was not already cleaned, the snapshot is lost and keychain settings cannot be restored automatically.");
+  }
 } catch (error) {
   core.setFailed(error instanceof Error ? error.message : "Cleanup failed.");
 }

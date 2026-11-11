@@ -103,7 +103,7 @@ The import action has no outputs. Use a GitHub secret for each certificate passw
 
 Setup registers its cleanup path through `GITHUB_STATE` before creating the keychain. That state only connects this setup invocation's main and post processes. Independent `uses` invocations cannot share `GITHUB_STATE`; import finds the restricted state file through the explicit keychain path instead.
 
-Setup failures attempt immediate cleanup. If an OS cleanup operation fails, the action attempts the other cleanup operations, retains state for retry, and reports failure. The post action retries retained setup state. Unexpected directory contents are not recursively deleted. A hard runner termination can prevent cleanup entirely; operators of self-hosted runners must handle abandoned resources.
+Setup failures attempt immediate cleanup. If an OS cleanup operation fails, the action attempts the other cleanup operations, retains state for retry, and reports failure. The post action retries retained setup state. Post cleanup also removes private, owned files matching the action's exact temporary certificate filename format after an interrupted import. Unexpected files, symlinks, and hard links are preserved and reported; directories are never recursively deleted during post cleanup. Do not remove or alter the managed directory during the job. If it is missing, post warns that the saved snapshot is unavailable and automatic restoration cannot be verified. A hard runner termination can prevent cleanup entirely; operators of self-hosted runners must handle abandoned resources.
 
 ## Security and boundaries
 
@@ -114,6 +114,7 @@ Setup failures attempt immediate cleanup. If an OS cleanup operation fails, the 
 - Only keychains created by this action in the same job are supported. Existing user keychains, general password items, and batch certificate inputs are out of scope. Repeat the import step for multiple identities.
 - Setup changes the **user** search list and optionally default. Use a dedicated runner user and serial steps. Concurrent jobs sharing one macOS user, out-of-order cleanup, or other tools modifying keychain settings during the job are unsupported. Cleanup restores the captured snapshot, so intervening changes may be overwritten.
 - The action does not clean up your original certificate files, install Apple trust chains, or grant platform signing entitlements. Valid identities and provisioning remain prerequisites for your build.
+- The keychain uses a six-hour idle timeout and may lock on sleep. Import unlocks it before use; a later signing step after a long idle period can fail. Schedule setup/import close to signing. There is no public password output or standalone unlock action.
 - Keep both action refs aligned. Self-hosted runners must support JavaScript actions using Node.js 24 and have `/usr/bin/security` and `/usr/bin/codesign` available.
 
 ## Development and verification

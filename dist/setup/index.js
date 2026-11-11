@@ -3096,7 +3096,7 @@ function create(temp2, setDefault, run, register) {
   }
 }
 function cleanup(temp2, keychain2, run) {
-  if (!fs.existsSync(path.dirname(keychain2))) return;
+  if (!fs.existsSync(path.dirname(keychain2))) return false;
   const state = readState(temp2, keychain2);
   const failures = [];
   const attempt = (label, fn) => {
@@ -3118,11 +3118,21 @@ function cleanup(temp2, keychain2, run) {
       run(["delete-keychain", keychain2]);
     }
   });
+  for (const name of fs.readdirSync(path.dirname(keychain2))) {
+    if (/^import-[a-f0-9]{24}\.p12$/.test(name)) {
+      attempt("temporary certificate deletion", () => {
+        const file = path.join(path.dirname(keychain2), name);
+        privateEntry(file, false);
+        fs.unlinkSync(file);
+      });
+    }
+  }
   if (failures.length) throw new Error(`Cleanup incomplete: ${failures.join(", ")}. Managed state retained for retry.`);
   const remaining = fs.readdirSync(path.dirname(keychain2));
   if (remaining.some((name) => name !== "state.json")) throw new Error("Unexpected managed directory contents; state retained for inspection.");
   fs.rmSync(path.join(path.dirname(keychain2), "state.json"));
   fs.rmdirSync(path.dirname(keychain2));
+  return true;
 }
 
 // src/setup.ts

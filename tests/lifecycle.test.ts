@@ -81,20 +81,24 @@ for (const command of ['create-keychain', 'set-keychain-settings', 'unlock-keych
   });
 }
 
-test('cleanup tries independent operations and retains state for retry', () => {
-  const f = fixture();
-  try {
-    const state = create(f.temp, true, f.run, () => {});
-    f.fail('default-keychain');
-    assert.throws(() => cleanup(f.temp, state.keychain, f.run), /default restoration/);
-    assert.equal(fs.existsSync(state.keychain), false);
-    assert.deepEqual(f.search(), ['/original/login.keychain-db']);
-    assert.equal(readState(f.temp, state.keychain).keychain, state.keychain);
-    cleanup(f.temp, state.keychain, f.run);
-    assert.equal(f.defaultKeychain(), '/original/login.keychain-db');
-    assert.deepEqual(fs.readdirSync(f.temp), []);
-  } finally { f.dispose(); }
-});
+for (const command of ['default-keychain', 'list-keychains', 'delete-keychain']) {
+  test(`cleanup retries ${command} failure after attempting independent operations`, () => {
+    const f = fixture();
+    try {
+      const state = create(f.temp, true, f.run, () => {});
+      f.fail(command);
+      assert.throws(() => cleanup(f.temp, state.keychain, f.run), /Cleanup incomplete/);
+      assert.equal(fs.existsSync(state.keychain), command === 'delete-keychain');
+      if (command !== 'list-keychains') assert.deepEqual(f.search(), ['/original/login.keychain-db']);
+      if (command !== 'default-keychain') assert.equal(f.defaultKeychain(), '/original/login.keychain-db');
+      assert.equal(readState(f.temp, state.keychain).keychain, state.keychain);
+      cleanup(f.temp, state.keychain, f.run);
+      assert.equal(f.defaultKeychain(), '/original/login.keychain-db');
+      assert.deepEqual(f.search(), ['/original/login.keychain-db']);
+      assert.deepEqual(fs.readdirSync(f.temp), []);
+    } finally { f.dispose(); }
+  });
+}
 
 test('two imports preserve source and prior identities; failed partition update only removes temporary copy', () => {
   const f = fixture();
@@ -164,3 +168,46 @@ test('platform and runner environment are required', () => {
   try { assert.throws(runnerTemp, /macOS|RUNNER_TEMP/); }
   finally { if (previous !== undefined) process.env.RUNNER_TEMP = previous; }
 });
+
+
+test('missing managed directory reports unavailable restoration instead of success', () => {
+  const f = fixture();
+  try {
+    const state = create(f.temp, true, f.run, () => {});
+    fs.rmSync(path.dirname(state.keychain), { recursive: true });
+    const before = f.calls.length;
+    assert.equal(cleanup(f.temp, state.keychain, f.run), false);
+    assert.equal(f.calls.length, before);
+  } finally { f.dispose(); }
+});
+
+test('post cleanup removes owned certificate copies left by an interrupted import', () => {
+  const f = fixture();
+  try {
+    const state = create(f.temp, true, f.run, () => {});
+    const residue = path.join(path.dirname(state.keychain), `import-${'a'.repeat(24)}.p12`);
+    fs.writeFileSync(residue, 'disposable certificate', { mode: 0o600 });
+    assert.equal(cleanup(f.temp, state.keychain, f.run), true);
+    assert.deepEqual(fs.readdirSync(f.temp), []);
+    assert.equal(f.defaultKeychain(), '/original/login.keychain-db');
+  } finally { f.dispose(); }
+});
+
+for (const kind of ['unknown', 'symlink', 'hardlink', 'permissions']) {
+  test(`cleanup preserves unexpected or unsafe residue: ${kind}`, () => {
+    const f = fixture();
+    try {
+      const state = create(f.temp, false, f.run, () => {});
+      const original = path.join(f.temp, 'original.p12');
+      fs.writeFileSync(original, 'original', { mode: 0o600 });
+      const residue = path.join(path.dirname(state.keychain), kind === 'unknown' ? 'unrelated.txt' : `import-${'b'.repeat(24)}.p12`);
+      if (kind === 'symlink') fs.symlinkSync(original, residue);
+      else if (kind === 'hardlink') fs.linkSync(original, residue);
+      else fs.writeFileSync(residue, 'residue', { mode: kind === 'permissions' ? 0o644 : 0o600 });
+      assert.throws(() => cleanup(f.temp, state.keychain, f.run));
+      assert.equal(fs.readFileSync(original, 'utf8'), 'original');
+      assert.ok(fs.lstatSync(residue));
+      assert.equal(readState(f.temp, state.keychain).keychain, state.keychain);
+    } finally { f.dispose(); }
+  });
+}
